@@ -52,6 +52,8 @@ type Transaction = {
   hash: string;
   fiatAmount: number;
   currency: FiatCurrency;
+  from: string;
+  to: string;
 };
 
 export default function WalletScreen() {
@@ -65,10 +67,15 @@ export default function WalletScreen() {
     balances,
     addresses,
     transactions: walletTransactions,
+    error,
+    clearError,
   } = useWallet();
   const [refreshing, setRefreshing] = useState(false);
   const [aggregatedBalances, setAggregatedBalances] = useState<AggregatedBalance>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [mockTransactions, setMockTransactions] = useState<Transaction[]>([]);
+  const allowMocks =
+    __DEV__ && process.env.EXPO_PUBLIC_ENABLE_MOCK_TX === 'true';
   const [mounted, setMounted] = useState(false);
   const avatar = useWalletAvatar();
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -195,6 +202,8 @@ export default function WalletScreen() {
             hash: tx.transactionHash,
             fiatAmount: fiatAmount,
             currency: FiatCurrency.USD,
+            from: tx.from,
+            to: tx.to,
           };
         })
     );
@@ -243,6 +252,10 @@ export default function WalletScreen() {
     }
   };
 
+  const handleDismissError = () => {
+    clearError();
+  };
+
   useEffect(() => {
     getAggregatedBalances().then(setAggregatedBalances);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -252,6 +265,35 @@ export default function WalletScreen() {
     getTransactions().then(setTransactions);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletTransactions?.list, addresses]);
+
+  useEffect(() => {
+    if (walletTransactions?.list?.length) {
+      setMockTransactions([]);
+    }
+  }, [walletTransactions?.list]);
+
+  const createMockTransaction = (): Transaction => ({
+    id: Date.now(),
+    type: 'received',
+    asset: 'USD₮',
+    token: 'usdt',
+    amount: '25.00',
+    icon: ArrowDownLeft,
+    iconColor: colors.success,
+    blockchain: 'ethereum',
+    hash: `0xmock${Date.now().toString(16)}`.padEnd(66, '0'),
+    fiatAmount: 25,
+    currency: FiatCurrency.USD,
+    from: '0x0000000000000000000000000000000000000000',
+    to: '0x1111111111111111111111111111111111111111',
+  });
+
+  const handleAddMockTransaction = () => {
+    setMockTransactions([createMockTransaction()]);
+  };
+
+  const displayTransactions =
+    transactions.length > 0 ? transactions : allowMocks ? mockTransactions : [];
 
   // Force component to fully mount before enabling RefreshControl on iOS
   useEffect(() => {
@@ -320,6 +362,14 @@ export default function WalletScreen() {
           )
         }
       >
+        {error && (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity onPress={handleDismissError}>
+              <Text style={styles.errorAction}>Dismiss</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         {/* Balance */}
         {!hasWallet && !isLoading ? (
           <TouchableOpacity onPress={handleCreateWallet}>
@@ -411,9 +461,27 @@ export default function WalletScreen() {
             ) : null}
           </View>
 
-          {transactions.length > 0 ? (
-            transactions.map(tx => (
-              <View key={tx.id} style={styles.transactionRow}>
+          {displayTransactions.length > 0 ? (
+            displayTransactions.map(tx => (
+              <TouchableOpacity
+                key={tx.id}
+                style={styles.transactionRow}
+                onPress={() =>
+                  router.push({
+                    pathname: '/transaction-details',
+                    params: {
+                      hash: tx.hash,
+                      amount: tx.amount,
+                      token: tx.asset,
+                      blockchain: tx.blockchain,
+                      type: tx.type,
+                      from: tx.from,
+                      to: tx.to,
+                      fiatAmount: String(tx.fiatAmount),
+                    },
+                  })
+                }
+              >
                 <View style={styles.transactionIcon}>
                   <tx.icon size={16} color={tx.iconColor} />
                 </View>
@@ -427,11 +495,16 @@ export default function WalletScreen() {
                   <Text style={styles.transactionAssetAmount}>{tx.amount}</Text>
                   <Text style={styles.transactionUsdAmount}>{formatUSDValue(tx.fiatAmount)}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))
           ) : (
             <View style={styles.noAssetsContainer}>
               <Text style={styles.noAssetsText}>No transactions yet</Text>
+              {allowMocks && (
+                <TouchableOpacity style={styles.mockButton} onPress={handleAddMockTransaction}>
+                  <Text style={styles.mockButtonText}>Add Mock Transaction</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -559,6 +632,40 @@ const styles = StyleSheet.create({
   noAssetsText: {
     fontSize: 16,
     color: colors.textSecondary,
+  },
+  mockButton: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  mockButtonText: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  errorBanner: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: colors.dangerBackground,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  errorText: {
+    color: colors.danger,
+    flex: 1,
+  },
+  errorAction: {
+    color: colors.primary,
+    fontWeight: '600',
   },
   assetAmount: {
     fontSize: 16,

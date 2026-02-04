@@ -2,7 +2,7 @@ import { SeedPhrase } from '@/components/SeedPhrase';
 import * as Clipboard from 'expo-clipboard';
 import { useDebouncedNavigation } from '@/hooks/use-debounced-navigation';
 import { ChevronLeft, Download, FileText, ScanText } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { colors } from '@/constants/colors';
 import {
   Alert,
@@ -16,11 +16,29 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
+import { useLocalSearchParams } from 'expo-router';
+import * as bip39 from 'bip39';
 
 export default function ImportWalletScreen() {
   const router = useDebouncedNavigation();
   const insets = useSafeAreaInsets();
   const [secretWords, setSecretWords] = useState<string[]>(Array(12).fill(''));
+  const params = useLocalSearchParams<{ scannedSeedPhrase?: string }>();
+
+  useEffect(() => {
+    if (!params.scannedSeedPhrase) return;
+    const words = params.scannedSeedPhrase
+      .trim()
+      .replace(/\n/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+    if (words.length === 12 || words.length === 24) {
+      setSecretWords(words.slice(0, 12));
+      toast.success('Seed phrase scanned');
+    } else {
+      toast.error('Invalid seed phrase scanned');
+    }
+  }, [params.scannedSeedPhrase]);
 
   const handleWordChange = (index: number, text: string) => {
     const newWords = [...secretWords];
@@ -62,9 +80,13 @@ export default function ImportWalletScreen() {
   };
 
   const handleScanText = () => {
-    Alert.alert('Scan Text', 'Camera functionality would open here to scan QR code or text', [
-      { text: 'OK' },
-    ]);
+    router.push({
+      pathname: '/scan-qr',
+      params: {
+        returnRoute: '/wallet-setup/import-wallet',
+        scanMode: 'seed',
+      },
+    });
   };
 
   const isFormValid = () => {
@@ -72,22 +94,15 @@ export default function ImportWalletScreen() {
   };
 
   const validateSeedPhrase = (phrase: string): boolean => {
-    const words = phrase
-      .trim()
-      .split(' ')
-      .filter(word => word.length > 0);
+    const normalized = phrase.trim().replace(/\s+/g, ' ');
+    const words = normalized.split(' ').filter(Boolean);
 
     // Check if we have exactly 12 or 24 words
     if (words.length !== 12 && words.length !== 24) {
       return false;
     }
 
-    // Basic word validation - each word should be at least 3 characters
-    const validWords = words.every(
-      word => word.length >= 3 && /^[a-z]+$/.test(word) // only lowercase letters
-    );
-
-    return validWords;
+    return bip39.validateMnemonic(normalized);
   };
 
   const handleImportWallet = () => {

@@ -1,7 +1,7 @@
 import { CommonActions, useNavigation } from '@react-navigation/native';
 import { useWallet } from '@tetherto/wdk-react-native-provider';
 import { useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/constants/colors';
@@ -11,35 +11,41 @@ export default function CompleteScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ walletName: string; mnemonic: string }>();
-  const { createWallet, isLoading } = useWallet();
+  const { createWallet, isLoading, isInitialized } = useWallet();
   const [walletCreated, setWalletCreated] = useState(false);
+  const createInFlightRef = useRef(false);
 
   useEffect(() => {
-    // Auto-create wallet when screen loads
+    if (!isInitialized) {
+      return;
+    }
+
+    if (walletCreated || createInFlightRef.current) {
+      return;
+    }
+
     createWalletWithWDK();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isInitialized, walletCreated]);
 
   const createWalletWithWDK = async () => {
-    if (walletCreated) return;
-
+    if (walletCreated || createInFlightRef.current) return;
+    createInFlightRef.current = true;
+  
     try {
       const walletName = params.walletName || 'My Wallet';
       const mnemonic = params.mnemonic.split(',').join(' ');
-
-      // Use the wallet context to create the wallet
+  
       await createWallet({
         name: walletName,
         mnemonic,
       });
-
-      // Persist wallet metadata and mnemonic for future switching
       await addWallet({
         name: walletName,
         avatar: params.avatar,
         mnemonic,
       });
-
+  
       setWalletCreated(true);
     } catch (error) {
       console.error('Failed to create wallet:', error);
@@ -48,6 +54,8 @@ export default function CompleteScreen() {
         'There was an issue creating your wallet. Please try again.',
         [{ text: 'Retry', onPress: () => createWalletWithWDK() }]
       );
+    } finally {
+      createInFlightRef.current = false;
     }
   };
 

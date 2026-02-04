@@ -34,6 +34,7 @@ import formatTokenAmount from '@/utils/format-token-amount';
 import formatUSDValue from '@/utils/format-usd-value';
 import Header from '@/components/header';
 import { toast } from 'sonner-native';
+import { isValidAddressForNetwork } from '@/utils/validate-address';
 
 export default function SendDetailsScreen() {
   const insets = useSafeAreaInsets();
@@ -71,6 +72,7 @@ export default function SendDetailsScreen() {
     error: undefined,
   });
   const [amountError, setAmountError] = useState<string | null>(null);
+  const [addressError, setAddressError] = useState<string | null>(null);
   const [sendingTransaction, setSendingTransaction] = useState(false);
   const [transactionResult, setTransactionResult] = useState<{
     txId?: { fee: string; hash: string };
@@ -213,8 +215,16 @@ export default function SendDetailsScreen() {
   ]);
 
   const handlePasteAddress = useCallback(() => {
-    Clipboard.getStringAsync().then(setRecipientAddress);
-  }, []);
+    Clipboard.getStringAsync().then(text => {
+      setRecipientAddress(text);
+      const networkType = getNetworkType(networkId);
+      setAddressError(
+        isValidAddressForNetwork(text, networkType)
+          ? null
+          : 'Address does not match the selected network'
+      );
+    });
+  }, [networkId]);
 
   const handleUseMax = useCallback(() => {
     const numericBalance = parseFloat(tokenBalance.replace(/,/g, ''));
@@ -313,6 +323,11 @@ export default function SendDetailsScreen() {
       Alert.alert('Error', 'Please enter a recipient address');
       return false;
     }
+    const networkType = getNetworkType(networkId);
+    if (!isValidAddressForNetwork(recipientAddress, networkType)) {
+      Alert.alert('Error', 'Recipient address does not match the selected network');
+      return false;
+    }
     if (!amount || parseFloat(amount) <= 0) {
       Alert.alert('Error', 'Please enter a valid amount');
       return false;
@@ -328,7 +343,20 @@ export default function SendDetailsScreen() {
     }
 
     return true;
-  }, [recipientAddress, amount, tokenBalance, inputMode]);
+  }, [recipientAddress, amount, tokenBalance, inputMode, networkId]);
+
+  useEffect(() => {
+    if (!recipientAddress) {
+      setAddressError(null);
+      return;
+    }
+    const networkType = getNetworkType(networkId);
+    setAddressError(
+      isValidAddressForNetwork(recipientAddress, networkType)
+        ? null
+        : 'Address does not match the selected network'
+    );
+  }, [recipientAddress, networkId]);
 
   const handleSend = useCallback(async () => {
     if (!validateTransaction()) {
@@ -455,6 +483,7 @@ export default function SendDetailsScreen() {
                 onPaste={handlePasteAddress}
                 onQRScan={handleQRScan}
               />
+              {addressError && <Text style={styles.amountError}>{addressError}</Text>}
 
               <View style={styles.section} onLayout={handleAmountSectionLayout}>
                 <Text style={styles.sectionTitle}>Enter Amount</Text>
@@ -549,7 +578,9 @@ export default function SendDetailsScreen() {
                     styles.sendButtonDisabled,
                 ]}
                 onPress={handleSend}
-                disabled={!!(amountError || !amount || !recipientAddress || sendingTransaction)}
+                disabled={
+                  !!(amountError || addressError || !amount || !recipientAddress || sendingTransaction)
+                }
               >
                 <Text
                   style={[

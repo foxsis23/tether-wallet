@@ -6,6 +6,9 @@ import React, { useCallback, useState } from 'react';
 import { Alert, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/constants/colors';
+import { getNetworkType } from '@/utils/gas-fee-calculator';
+import { isValidAddressForNetwork, normalizeScannedValue } from '@/utils/validate-address';
+import * as bip39 from 'bip39';
 
 const { width: screenWidth } = Dimensions.get('window');
 const qrSize = screenWidth * 0.7;
@@ -13,7 +16,7 @@ const qrSize = screenWidth * 0.7;
 export default function ScanQRScreen() {
   const insets = useSafeAreaInsets();
   const router = useDebouncedNavigation();
-  const { returnRoute, ...params } = useLocalSearchParams();
+  const { returnRoute, scanMode, networkId, ...params } = useLocalSearchParams();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
 
@@ -23,32 +26,72 @@ export default function ScanQRScreen() {
 
       setScanned(true);
 
-      // Validate if it's a valid address format (basic validation)
-      if (!data || data.length < 10) {
-        Alert.alert('Invalid QR Code', 'The scanned QR code does not contain a valid address.', [
-          {
-            text: 'Try Again',
-            onPress: () => setScanned(false),
-          },
-        ]);
-        return;
+      const normalized = normalizeScannedValue(data);
+      const isSeedScan = scanMode === 'seed';
+
+      if (isSeedScan) {
+        const words = normalized
+          .replace(/\n/g, ' ')
+          .split(/\s+/)
+          .filter(Boolean);
+        const isValidSeed =
+          (words.length === 12 || words.length === 24) && bip39.validateMnemonic(words.join(' '));
+
+        if (!isValidSeed) {
+          Alert.alert(
+            'Invalid Seed Phrase',
+            'The scanned code does not contain a valid 12 or 24 word phrase.',
+            [
+              {
+                text: 'Try Again',
+                onPress: () => setScanned(false),
+              },
+            ]
+          );
+          return;
+        }
+
+        if (returnRoute) {
+          router.replace({
+            pathname: returnRoute as any,
+            params: { scannedSeedPhrase: normalized, ...params },
+          });
+          return;
+        }
+      } else {
+        const networkType = networkId ? getNetworkType(String(networkId)) : undefined;
+        const isValidAddress = isValidAddressForNetwork(normalized, networkType);
+
+        if (!isValidAddress) {
+          Alert.alert(
+            'Invalid QR Code',
+            'The scanned QR code does not contain a valid address for this network.',
+            [
+              {
+                text: 'Try Again',
+                onPress: () => setScanned(false),
+              },
+            ]
+          );
+          return;
+        }
       }
 
       // Navigate back with the scanned address
       if (returnRoute) {
         router.replace({
           pathname: returnRoute as any,
-          params: { scannedAddress: data, ...params },
+          params: { scannedAddress: normalized, ...params },
         });
       } else {
         // Fallback - navigate to send flow starting with token selection
         router.replace({
           pathname: '/send/select-token',
-          params: { scannedAddress: data, ...params },
+          params: { scannedAddress: normalized, ...params },
         });
       }
     },
-    [scanned, router, returnRoute, params]
+    [scanned, router, returnRoute, params, scanMode, networkId]
   );
 
   const handleClose = useCallback(() => {

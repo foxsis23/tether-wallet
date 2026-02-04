@@ -15,11 +15,27 @@
     "prebuild": "expo prebuild",
     "prebuild:clean": "expo prebuild --clean",
     "preinstall": "npm install @tetherto/pear-wrk-wdk --ignore-scripts --legacy-peer-deps 2>/dev/null || true",
+    "test": "jest",
     "test:e2e": "export ANDROID_HOME=$HOME/Library/Android/sdk && export PATH=$PATH:$ANDROID_HOME/platform-tools && wdio run test/wdio.conf.ts",
     "test:e2e:ios": "export ANDROID_HOME=$HOME/Library/Android/sdk && export PATH=$PATH:$ANDROID_HOME/platform-tools && wdio run test/wdio.ios.conf.ts",
     "test:e2e:android": "export ANDROID_HOME=$HOME/Library/Android/sdk && export PATH=$PATH:$ANDROID_HOME/platform-tools && wdio run test/wdio.conf.ts",
     "build:e2e:android": "export JAVA_HOME=$(/usr/libexec/java_home -v 21) && export PATH=$JAVA_HOME/bin:$PATH && npx expo export --platform android --output-dir ./dist && npx expo prebuild --platform android --clean && echo \"sdk.dir=$HOME/Library/Android/sdk\" > android/local.properties && cd android && ./gradlew assembleRelease && cp app/build/outputs/apk/release/app-release.apk ../test/apps/app-release.apk",
     "build:e2e:ios": "export NVM_DIR=\"$HOME/.nvm\" && [ -s \"$NVM_DIR/nvm.sh\" ] && \\. \"$NVM_DIR/nvm.sh\" && npx expo export --platform ios --output-dir ./dist && cp -r dist/_expo ios/ 2>/dev/null || true && RELEASE_APP=$(find ~/Library/Developer/Xcode/DerivedData -name 'wdkstarterreactnative.app' -path '*/Release-iphonesimulator/*' -type d | head -1) && if [ -n \"$RELEASE_APP\" ]; then rm -rf test/apps/wdkstarterreactnative.app && cp -r \"$RELEASE_APP\" test/apps/wdkstarterreactnative.app && echo 'Copied existing Release build'; else echo 'No existing Release build found. Please run: npx expo run:ios --configuration Release first'; exit 1; fi"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "setupFilesAfterEnv": [
+      "<rootDir>/test/jest.setup.ts"
+    ],
+    "testMatch": [
+      "<rootDir>/test/**/*.test.ts"
+    ],
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/src/$1"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(react-native|@react-native|react-native-keychain|@tetherto|expo|expo-.*|expo-modules-core|expo-router|@expo/.*)/)"
+    ]
   },
   "dependencies": {
     "@craftzdog/react-native-buffer": "^6.1.0",
@@ -89,10 +105,12 @@
     "sodium-javascript": "^0.8.0",
     "sonner-native": "^0.21.1",
     "stream-browserify": "^3.0.0",
-    "stream-http": "^3.2.0"
+    "stream-http": "^3.2.0",
+    "viem": "^2.45.1"
   },
   "devDependencies": {
     "@types/b4a": "^1.6.5",
+    "@types/jest": "^30.0.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20.0.0",
     "@types/react": "~19.1.0",
@@ -106,6 +124,8 @@
     "eslint-config-expo": "~10.0.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
+    "jest": "^29.7.0",
+    "jest-expo": "^54.0.17",
     "prettier": "^3.6.2",
     "react-native-svg-transformer": "^1.5.1",
     "sharp-cli": "^5.2.0",

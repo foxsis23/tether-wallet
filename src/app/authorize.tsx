@@ -4,7 +4,6 @@ import { Fingerprint, Shield } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import parseWorkletError from '@/utils/parse-worklet-error';
 import { colors } from '@/constants/colors';
 import getErrorMessage from '@/utils/get-error-message';
 
@@ -48,6 +47,21 @@ export default function AuthorizeScreen() {
     handleAuthorize();
   };
 
+  const handleRestoreAccess = () => {
+    Alert.alert(
+      'Restore Access',
+      'You will need your recovery phrase to restore access to this wallet on this device.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          style: 'default',
+          onPress: () => router.replace('/wallet-setup/import-wallet'),
+        },
+      ]
+    );
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.content}>
@@ -72,6 +86,19 @@ export default function AuthorizeScreen() {
             >
               <Fingerprint size={24} color={colors.white} />
               <Text style={styles.primaryButtonText}>Use Biometric</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => router.push('/pin')}
+            >
+              <Shield size={22} color={colors.primary} />
+              <Text style={styles.secondaryButtonText}>Use PIN</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.secondaryButton} onPress={handleRestoreAccess}>
+              <Shield size={22} color={colors.primary} />
+              <Text style={styles.secondaryButtonText}>Restore with Secret Phrase</Text>
             </TouchableOpacity>
           </>
         )}

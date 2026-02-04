@@ -1,6 +1,7 @@
 # Tether Wallet (my build)
 
 This is my implementation of a multi‑chain, non‑custodial wallet using WDK.  
+I used the **Tether WDK Starter** as a base for the parts where a ready‑made solution was available, and then extended/customized the rest.
 Below is a short, practical README describing **what I implemented**, **how to run**, and **how to test**.
 
 ## ✅ Implemented Features
